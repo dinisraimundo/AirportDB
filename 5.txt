@@ -1,0 +1,126 @@
+# 5.1
+
+SELECT 
+  CASE 
+    WHEN cidade_partida < cidade_chegada THEN cidade_partida 
+    ELSE cidade_chegada 
+  END AS cidade1,
+  CASE 
+    WHEN cidade_partida < cidade_chegada THEN cidade_chegada 
+    ELSE cidade_partida 
+  END AS cidade2,
+  SUM(passageiros_1c + passageiros_2c) AS total_passageiros,
+  SUM(a.capacidade) AS capacidade_total,
+  SUM(passageiros_1c + passageiros_2c)::float / NULLIF(SUM(a.capacidade), 0) AS preenchimento_medio
+FROM estatisticas_voos ev
+JOIN aviao a ON ev.no_serie = a.no_serie
+WHERE ano = (SELECT MAX(ano) FROM estatisticas_voos)
+GROUP BY cidade1, cidade2
+HAVING SUM(passageiros_1c + passageiros_2c)::float / NULLIF(SUM(a.capacidade), 0) = (
+    SELECT MAX(preench)
+    FROM (
+      SELECT 
+        SUM(passageiros_1c + passageiros_2c)::float / NULLIF(SUM(a2.capacidade), 0) AS preench
+      FROM estatisticas_voos ev2
+      JOIN aviao a2 ON ev2.no_serie = a2.no_serie
+      WHERE ano = (SELECT MAX(ano) FROM estatisticas_voos)
+      GROUP BY
+        CASE WHEN cidade_partida < cidade_chegada THEN cidade_partida ELSE cidade_chegada END,
+        CASE WHEN cidade_partida < cidade_chegada THEN cidade_chegada ELSE cidade_partida END
+    ) sub
+);
+
+## outra versao
+
+SELECT
+  cidade1,
+  cidade2,
+  total_passageiros
+FROM (
+  SELECT
+    LEAST(cidade_partida, cidade_chegada) AS cidade1,
+    GREATEST(cidade_partida, cidade_chegada) AS cidade2,
+    SUM(passageiros_1c + passageiros_2c) AS total_passageiros
+  FROM estatisticas_voos
+  WHERE ano = (SELECT MAX(ano) FROM estatisticas_voos)
+  GROUP BY LEAST(cidade_partida, cidade_chegada), GREATEST(cidade_partida, cidade_chegada)
+) AS totais
+WHERE total_passageiros = (
+  SELECT MAX(total_passageiros)
+  FROM (
+    SELECT
+      SUM(passageiros_1c + passageiros_2c) AS total_passageiros
+    FROM estatisticas_voos
+    WHERE ano = (SELECT MAX(ano) FROM estatisticas_voos)
+    GROUP BY LEAST(cidade_partida, cidade_chegada), GREATEST(cidade_partida, cidade_chegada)
+  ) AS subtotais
+);
+
+
+
+# 5.2
+
+
+SELECT
+  CASE 
+    WHEN cidade_partida < cidade_chegada THEN cidade_partida
+    ELSE cidade_chegada
+  END AS cidade1,
+  CASE 
+    WHEN cidade_partida < cidade_chegada THEN cidade_chegada
+    ELSE cidade_partida
+  END AS cidade2
+FROM estatisticas_voos
+WHERE make_date(ano::INT, mes::INT, dia_do_mes::INT) >= CURRENT_DATE - INTERVAL '3 months'
+GROUP BY cidade1, cidade2
+HAVING COUNT(DISTINCT no_serie) = (SELECT COUNT(*) FROM aviao);
+
+
+
+
+
+# 5.3
+
+SELECT
+  -- Dimensão espacial (partida + chegada em simultâneo)
+  pais_partida,
+  cidade_partida,
+  pais_chegada,
+  cidade_chegada,
+
+  -- Dimensão temporal
+  ano,
+  mes,
+  dia_do_mes,
+
+  -- Métricas
+  SUM(vendas_1c) AS total_vendas_1c,
+  SUM(vendas_2c) AS total_vendas_2c,
+  SUM(vendas_1c + vendas_2c) AS total_geral
+FROM estatisticas_voos
+GROUP BY ROLLUP (
+  -- espaço
+  (pais_partida, cidade_partida, pais_chegada, cidade_chegada),
+  -- tempo
+  (ano, mes, dia_do_mes)
+)
+ORDER BY 
+  pais_partida NULLS LAST, cidade_partida,
+  pais_chegada NULLS LAST, cidade_chegada,
+  ano, mes, dia_do_mes;
+
+# 5.4
+
+SELECT
+  pais_partida,
+  cidade_partida,
+  dia_da_semana,
+  SUM(passageiros_1c) AS total_1c,
+  SUM(passageiros_2c) AS total_2c,
+  CASE
+    WHEN SUM(passageiros_2c) = 0 THEN NULL
+    ELSE ROUND(SUM(passageiros_1c)::NUMERIC / SUM(passageiros_2c), 2)
+  END AS ratio_1c_2c
+FROM estatisticas_voos
+GROUP BY ROLLUP (pais_partida, cidade_partida, dia_da_semana)
+ORDER BY pais_partida NULLS LAST, cidade_partida, dia_da_semana;
