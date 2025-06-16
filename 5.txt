@@ -1,37 +1,5 @@
 # 5.1
 
-SELECT 
-  CASE 
-    WHEN cidade_partida < cidade_chegada THEN cidade_partida 
-    ELSE cidade_chegada 
-  END AS cidade1,
-  CASE 
-    WHEN cidade_partida < cidade_chegada THEN cidade_chegada 
-    ELSE cidade_partida 
-  END AS cidade2,
-  SUM(passageiros_1c + passageiros_2c) AS total_passageiros,
-  SUM(a.capacidade) AS capacidade_total,
-  SUM(passageiros_1c + passageiros_2c)::float / NULLIF(SUM(a.capacidade), 0) AS preenchimento_medio
-FROM estatisticas_voos ev
-JOIN aviao a ON ev.no_serie = a.no_serie
-WHERE ano = (SELECT MAX(ano) FROM estatisticas_voos)
-GROUP BY cidade1, cidade2
-HAVING SUM(passageiros_1c + passageiros_2c)::float / NULLIF(SUM(a.capacidade), 0) = (
-    SELECT MAX(preench)
-    FROM (
-      SELECT 
-        SUM(passageiros_1c + passageiros_2c)::float / NULLIF(SUM(a2.capacidade), 0) AS preench
-      FROM estatisticas_voos ev2
-      JOIN aviao a2 ON ev2.no_serie = a2.no_serie
-      WHERE ano = (SELECT MAX(ano) FROM estatisticas_voos)
-      GROUP BY
-        CASE WHEN cidade_partida < cidade_chegada THEN cidade_partida ELSE cidade_chegada END,
-        CASE WHEN cidade_partida < cidade_chegada THEN cidade_chegada ELSE cidade_partida END
-    ) sub
-);
-
-## outra versao
-
 SELECT
   cidade1,
   cidade2,
