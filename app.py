@@ -220,11 +220,6 @@ def ping():
     return jsonify({"message": "pong!", "status": "success"})
 
 
-# Trocar para vir na string e nao no body
-
-# Preço dos bilhetes pode ser fixo mas tem de ser mais caro os de 1 classe
-
-# ver tips do slack
 
 @app.route("/compra/<int:voo>/", methods=["POST"])
 @limiter.limit("1 per second")
